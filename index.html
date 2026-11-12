@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>중1 과학: 기체의 부피, 입자 충돌 횟수 및 압력 관계 시뮬레이터</title>
+    <!-- Tailwind CSS 로드 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Noto Sans KR & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #0f172a; /* Slate 900 */
+            color: #f8fafc;
+        }
+        .font-mono-num {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* 커스텀 슬라이더 스타일 */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 22px;
+            width: 22px;
+            border-radius: 50%;
+            background: #38bdf8;
+            cursor: pointer;
+            margin-top: -8px;
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 999px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- 상단 헤더 -->
+    <header class="bg-slate-800/90 backdrop-blur-md border-b border-slate-700 sticky top-0 z-10">
+        <div class="max-w-7xl mx-auto px-4 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-xl bg-sky-500/20 border border-sky-400/40 flex items-center justify-center text-sky-400 font-black text-lg">
+                    중1
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">중학교 1학년 과학 · 기체의 성질</span>
+                    </div>
+                    <h1 class="text-lg sm:text-xl font-bold text-white tracking-tight mt-0.5">기체의 부피·입자 충돌 횟수·압력 시뮬레이터</h1>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="btnReset" class="px-3.5 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-bold transition flex items-center gap-1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    처음으로
+                </button>
+                <button id="btnPause" class="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-sm font-bold transition flex items-center gap-1.5">
+                    <span id="pauseIcon">⏸</span> <span id="pauseText">일시정지</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 컨텐츠 영역 -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-5">
+        
+        <!-- 왼쪽: 주사기(실린더) 시뮬레이션 및 조작 패널 (7 cols) -->
+        <div class="lg:col-span-7 flex flex-col gap-4">
+            <!-- 실린더 캔버스 컨테이너 -->
+            <div class="bg-slate-800 rounded-2xl border border-slate-700 p-4 shadow-xl flex flex-col">
+                <div class="flex flex-wrap justify-between items-center gap-2 mb-3">
+                    <span class="text-sm font-bold text-slate-200 flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        주사기(실린더) 속 기체 입자의 운동
+                    </span>
+                    <span class="text-xs text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/30 font-medium">
+                        💡 파란색 피스톤을 직접 밀거나 당겨보세요!
+                    </span>
+                </div>
+                
+                <!-- 캔버스 Wrapper -->
+                <div id="canvasContainer" class="relative w-full h-[300px] sm:h-[350px] bg-slate-950 rounded-xl overflow-hidden border border-slate-700/80 cursor-ew-resize">
+                    <canvas id="simCanvas"></canvas>
+                </div>
+
+                <!-- 중1 교과서 실험 프리셋 버튼 (배수 비교) -->
+                <div class="mt-4">
+                    <div class="text-xs font-bold text-slate-400 mb-2">📌 교과서 실험 비교 버튼 (온도와 입자 수는 일정할 때):</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="setVolume(60)" class="preset-btn py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-xs sm:text-sm font-bold text-sky-300 transition">
+                            1배 압력 (60 mL)
+                        </button>
+                        <button onclick="setVolume(30)" class="preset-btn py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-xs sm:text-sm font-bold text-amber-300 transition">
+                            2배 압력 (30 mL)
+                        </button>
+                        <button onclick="setVolume(20)" class="preset-btn py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-xs sm:text-sm font-bold text-rose-300 transition">
+                            3배 압력 (20 mL)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 부피 조절 메인 슬라이더 -->
+                <div class="mt-4 bg-slate-900/70 p-4 rounded-xl border border-slate-700/60">
+                    <div class="flex justify-between items-center mb-2">
+                        <label for="volumeSlider" class="text-sm font-bold text-sky-400 flex items-center gap-1.5">
+                            기체의 부피 조절 (mL)
+                        </label>
+                        <span id="volumeDisplay" class="font-mono-num text-lg font-bold text-white bg-slate-800 px-3 py-0.5 rounded-lg border border-slate-600">60 mL</span>
+                    </div>
+                    <input type="range" id="volumeSlider" min="15" max="90" value="60" step="1" class="w-full">
+                    <div class="flex justify-between text-xs text-slate-400 mt-1.5 font-medium">
+                        <span>15 mL (부피 작음 · 좁음)</span>
+                        <span>60 mL (기준)</span>
+                        <span>90 mL (부피 큼 · 넓음)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 변인 통제 (입자 수, 온도) -->
+            <div class="bg-slate-800 rounded-2xl border border-slate-700 p-4 shadow-xl">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs font-bold text-slate-300">⚙️ 변인 통제 설정 (보일 법칙 실험 시에는 값을 일정하게 유지하세요)</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- 입자 수 조절 -->
+                    <div class="bg-slate-900/60 p-3.5 rounded-xl border border-slate-700/50">
+                        <div class="flex justify-between items-center mb-2">
+                            <label for="countSlider" class="text-xs font-bold text-slate-300">기체 입자 수</label>
+                            <span id="countDisplay" class="font-mono-num text-sm font-bold text-emerald-400">40 개</span>
+                        </div>
+                        <input type="range" id="countSlider" min="10" max="100" value="40" step="5" class="w-full">
+                        <p class="text-[11px] text-slate-500 mt-1">입자 크기는 변하지 않고 개수만 조절됩니다.</p>
+                    </div>
+
+                    <!-- 온도(입자 빠르기) 조절 -->
+                    <div class="bg-slate-900/60 p-3.5 rounded-xl border border-slate-700/50">
+                        <div class="flex justify-between items-center mb-2">
+                            <label for="tempSlider" class="text-xs font-bold text-slate-300">기체의 온도 (입자 빠르기)</label>
+                            <span id="tempDisplay" class="font-mono-num text-sm font-bold text-amber-400">25 °C (일정)</span>
+                        </div>
+                        <input type="range" id="tempSlider" min="5" max="85" value="25" step="5" class="w-full">
+                        <p class="text-[11px] text-slate-500 mt-1">온도가 같으면 입자의 평균 빠르기가 같습니다.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 오른쪽: 실시간 계측 데이터 및 보일 법칙 설명 (5 cols) -->
+        <div class="lg:col-span-5 flex flex-col gap-4">
+            
+            <!-- 실시간 계측 카드 3종 -->
+            <div class="grid grid-cols-3 gap-2.5">
+                <!-- 부피 카드 -->
+                <div class="bg-slate-800 rounded-2xl border border-slate-700 p-3.5 flex flex-col justify-between shadow-lg">
+                    <span class="text-xs text-slate-400 font-bold">기체의 부피</span>
+                    <div class="my-1.5">
+                        <span id="metricVolume" class="font-mono-num text-xl sm:text-2xl font-bold text-sky-400">60</span>
+                        <span class="text-xs text-slate-400 font-bold">mL</span>
+                    </div>
+                    <span class="text-[11px] text-slate-400 bg-slate-900/80 px-2 py-0.5 rounded text-center">
+                        기준의 <span id="metricVolumeRatio" class="text-sky-300 font-bold">1.00</span>배
+                    </span>
+                </div>
+
+                <!-- 충돌 횟수 카드 -->
+                <div class="bg-slate-800 rounded-2xl border border-slate-700 p-3.5 flex flex-col justify-between shadow-lg">
+                    <span class="text-xs text-slate-400 font-bold">벽면 충돌 횟수</span>
+                    <div class="my-1.5">
+                        <span id="metricCollisions" class="font-mono-num text-xl sm:text-2xl font-bold text-amber-400">0</span>
+                        <span class="text-xs text-slate-400 font-bold">회/초</span>
+                    </div>
+                    <span class="text-[11px] text-slate-400 bg-slate-900/80 px-2 py-0.5 rounded text-center">
+                        1초간 벽에 부딪힌 수
+                    </span>
+                </div>
+
+                <!-- 압력 카드 -->
+                <div class="bg-slate-800 rounded-2xl border border-slate-700 p-3.5 flex flex-col justify-between shadow-lg relative overflow-hidden">
+                    <div id="pressureBgGlow" class="absolute inset-0 bg-rose-500/15 opacity-0 transition-opacity duration-300"></div>
+                    <span class="text-xs text-slate-400 font-bold relative z-10">기체의 압력</span>
+                    <div class="my-1.5 relative z-10">
+                        <span id="metricPressure" class="font-mono-num text-xl sm:text-2xl font-bold text-rose-400">1.00</span>
+                        <span class="text-xs text-slate-400 font-bold">기압</span>
+                    </div>
+                    <span class="text-[11px] text-slate-300 bg-slate-900/80 px-2 py-0.5 rounded text-center relative z-10">
+                        압력×부피 = <span id="metricPV" class="text-rose-300 font-mono-num font-bold">60</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- 부피-압력 관계 그래프 (보일 법칙 곡선 + 실시간 변화) -->
+            <div class="bg-slate-800 rounded-2xl border border-slate-700 p-4 shadow-xl flex-1 flex flex-col">
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="text-sm font-bold text-slate-200">📈 기체의 부피와 압력 관계 그래프</h2>
+                    <span class="text-[11px] text-rose-300 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/30">반비례 곡선 (보일 법칙)</span>
+                </div>
+                <div id="chartContainer" class="relative w-full h-[195px] bg-slate-950 rounded-xl border border-slate-700/80 overflow-hidden">
+                    <canvas id="chartCanvas"></canvas>
+                </div>
+            </div>
+
+            <!-- 중1 과학 핵심 개념 정리 박스 -->
+            <div class="bg-slate-800/95 rounded-2xl border border-sky-500/30 p-4 shadow-lg text-sm">
+                <h3 class="font-bold text-sky-400 mb-2.5 flex items-center gap-1.5 text-base">
+                    📘 중1 과학 핵심 정리: 보일 법칙
+                </h3>
+                <div class="space-y-2 text-slate-200 text-xs leading-relaxed">
+                    <div class="bg-slate-900/70 p-2.5 rounded-xl border border-slate-700/60">
+                        <span class="text-amber-400 font-bold">① 부피가 작아질 때 (피스톤을 누를 때):</span><br>
+                        입자가 움직이는 공간이 좁아져 <strong>벽면에 충돌하는 횟수가 증가</strong>하므로 기체의 <strong>압력이 커집니다.</strong>
+                    </div>
+                    <div class="bg-slate-900/70 p-2.5 rounded-xl border border-slate-700/60">
+                        <span class="text-emerald-400 font-bold">② 주의할 점 (변하지 않는 것):</span><br>
+                        부피가 변해도 <strong>입자의 개수, 입자의 크기, 입자의 빠르기(온도)</strong>는 변하지 않습니다!
+                    </div>
+                    <div class="bg-sky-950/60 p-2.5 rounded-xl border border-sky-500/30 text-sky-200 font-medium">
+                        ✨ <strong>결론:</strong> 온도가 일정할 때 일정량의 기체의 부피는 압력에 <strong>반비례</strong>합니다. (압력 × 부피 = 항상 일정)
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        /**
+         * 중학교 1학년 과학: 기체의 부피, 입자 충돌 횟수 및 압력 관계 시뮬레이터
+         * - 교과서 표준 단위(mL, 기압, °C) 사용
+         * - 60 mL일 때 1.00 기압을 기준으로 30 mL(2배), 20 mL(3배) 직관적 관찰 지원
+         * - 실시간 부피-압력 반비례 그래프(보일 법칙 곡선 위 현재 상태 점 표시)
+         */
+
+        // DOM 요소 참조
+        const simCanvas = document.getElementById('simCanvas');
+        const simCtx = simCanvas.getContext('2d');
+        const canvasContainer = document.getElementById('canvasContainer');
+
+        const chartCanvas = document.getElementById('chartCanvas');
+        const chartCtx = chartCanvas.getContext('2d');
+        const chartContainer = document.getElementById('chartContainer');
+
+        // 컨트롤 UI
+        const volumeSlider = document.getElementById('volumeSlider');
+        const countSlider = document.getElementById('countSlider');
+        const tempSlider = document.getElementById('tempSlider');
+        const btnPause = document.getElementById('btnPause');
+        const btnReset = document.getElementById('btnReset');
+
+        // 디스플레이 UI
+        const volumeDisplay = document.getElementById('volumeDisplay');
+        const countDisplay = document.getElementById('countDisplay');
+        const tempDisplay = document.getElementById('tempDisplay');
+        const metricVolume = document.getElementById('metricVolume');
+        const metricVolumeRatio = document.getElementById('metricVolumeRatio');
+        const metricCollisions = document.getElementById('metricCollisions');
+        const metricPressure = document.getElementById('metricPressure');
+        const metricPV = document.getElementById('metricPV');
+        const pressureBgGlow = document.getElementById('pressureBgGlow');
+
+        // 기준 상태 상수 (중1 교과서 실험 수치에 맞춘 직관적 기준)
+        const BASE_VOLUME = 60;     // 60 mL
+        const BASE_COUNT = 40;      // 40 개
+        const BASE_TEMP_C = 25;     // 25 °C (298.15 K)
+
+        // 시뮬레이션 상태 변수
+        let state = {
+            volume: BASE_VOLUME,        // 부피 (15 ~ 90 mL)
+            particleCount: BASE_COUNT,  // 입자 수 (10 ~ 100 개)
+            tempC: BASE_TEMP_C,         // 섭씨 온도 (5 ~ 85 °C)
+            isPaused: false,
+            isDraggingPiston: false,
+            currentPressure: 1.00
+        };
+
+        // 물리 및 레이아웃 상수
+        const PADDING = { top: 32, bottom: 34, left: 28, right: 36 };
+        const PISTON_WIDTH = 24;
+        const PARTICLE_RADIUS = 5.5;
+        const MAX_VOLUME_SCALE = 90; // 슬라이더 최대 부피(90 mL)
+
+        // 입자 배열 및 충돌 기록
+        let particles = [];
+        let collisionRipples = [];
+        let collisionTimestamps = [];
+        let impulseHistory = [];
+
+        /**
+         * 캔버스 해상도(DPR) 및 크기 반응형 초기화
+         */
+        function resizeCanvases() {
+            const dpr = window.devicePixelRatio || 1;
+
+            // 시뮬레이션 캔버스 크기 설정
+            const simRect = canvasContainer.getBoundingClientRect();
+            simCanvas.width = simRect.width * dpr;
+            simCanvas.height = simRect.height * dpr;
+            simCanvas.style.width = `${simRect.width}px`;
+            simCanvas.style.height = `${simRect.height}px`;
+            simCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            // 차트 캔버스 크기 설정
+            const chartRect = chartContainer.getBoundingClientRect();
+            chartCanvas.width = chartRect.width * dpr;
+            chartCanvas.height = chartRect.height * dpr;
+            chartCanvas.style.width = `${chartRect.width}px`;
+            chartCanvas.style.height = `${chartRect.height}px`;
+            chartCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            clampParticlesToCylinder();
+        }
+
+        /**
+         * 현재 부피(state.volume)에 따른 주사기(실린더) 내부 좌표 계산
+         */
+        function getCylinderBounds() {
+            const width = canvasContainer.clientWidth;
+            const height = canvasContainer.clientHeight;
+            
+            const minX = PADDING.left;
+            const maxAvailableWidth = width - PADDING.left - PADDING.right - PISTON_WIDTH;
+            
+            const volumeRatio = state.volume / MAX_VOLUME_SCALE;
+            const chamberWidth = maxAvailableWidth * volumeRatio;
+            const maxX = minX + chamberWidth;
+
+            return {
+                minX: minX,
+                maxX: maxX,
+                minY: PADDING.top,
+                maxY: height - PADDING.bottom,
+                chamberWidth: chamberWidth,
+                chamberHeight: height - PADDING.top - PADDING.bottom,
+                maxAvailableWidth: maxAvailableWidth
+            };
+        }
+
+        /**
+         * 섭씨 온도를 절대 온도로 변환하여 입자 기본 속력 계산
+         */
+        function getBaseSpeed(tempC) {
+            const kelvin = tempC + 273.15;
+            const baseKelvin = BASE_TEMP_C + 273.15;
+            return Math.sqrt(kelvin / baseKelvin) * 3.4;
+        }
+
+        /**
+         * 기체 입자 객체 생성
+         */
+        function createParticle(bounds) {
+            const speed = getBaseSpeed(state.tempC) * (0.75 + Math.random() * 0.5);
+            const angle = Math.random() * Math.PI * 2;
+            const margin = PARTICLE_RADIUS + 2;
+
+            return {
+                x: bounds.minX + margin + Math.random() * Math.max(10, bounds.chamberWidth - margin * 2),
+                y: bounds.minY + margin + Math.random() * Math.max(10, bounds.chamberHeight - margin * 2),
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                radius: PARTICLE_RADIUS,
+                flash: 0
+            };
+        }
+
+        /**
+         * 입자 수 조절에 맞춰 배열 동기화
+         */
+        function syncParticles() {
+            const bounds = getCylinderBounds();
+            while (particles.length < state.particleCount) {
+                particles.push(createParticle(bounds));
+            }
+            while (particles.length > state.particleCount) {
+                particles.pop();
+            }
+        }
+
+        /**
+         * 온도 변경 시 입자 속력 비율 업데이트
+         */
+        function updateParticlesTemperature(oldTempC, newTempC) {
+            const oldK = oldTempC + 273.15;
+            const newK = newTempC + 273.15;
+            const ratio = Math.sqrt(newK / oldK);
+            for (let p of particles) {
+                p.vx *= ratio;
+                p.vy *= ratio;
+            }
+        }
+
+        /**
+         * 피스톤 이동 시 입자가 실린더 밖으로 나가지 않도록 위치 보정
+         */
+        function clampParticlesToCylinder() {
+            const bounds = getCylinderBounds();
+            for (let p of particles) {
+                if (p.x - p.radius < bounds.minX) p.x = bounds.minX + p.radius;
+                if (p.x + p.radius > bounds.maxX) {
+                    p.x = bounds.maxX - p.radius;
+                    if (p.vx > 0) p.vx = -p.vx;
+                }
+                if (p.y - p.radius < bounds.minY) p.y = bounds.minY + p.radius;
+                if (p.y + p.radius > bounds.maxY) p.y = bounds.maxY - p.radius;
+            }
+        }
+
+        /**
+         * 벽면 충돌 기록 및 노란색 충돌 파동 생성
+         */
+        function recordCollision(x, y, impulse, now) {
+            collisionTimestamps.push(now);
+            impulseHistory.push({ time: now, impulse: impulse });
+
+            if (collisionRipples.length < 30) {
+                collisionRipples.push({
+                    x: x,
+                    y: y,
+                    radius: 2,
+                    alpha: 0.95
+                });
+            }
+        }
+
+        /**
+         * 물리 연산 업데이트 (1 프레임)
+         */
+        function updatePhysics() {
+            if (state.isPaused) return;
+
+            const bounds = getCylinderBounds();
+            const now = performance.now();
+
+            for (let p of particles) {
+                p.x += p.vx;
+                p.y += p.vy;
+
+                if (p.flash > 0) p.flash = Math.max(0, p.flash - 0.08);
+
+                // 왼쪽 벽 충돌
+                if (p.x - p.radius <= bounds.minX) {
+                    p.x = bounds.minX + p.radius;
+                    const impulse = Math.abs(p.vx) * 2;
+                    p.vx = Math.abs(p.vx);
+                    p.flash = 1.0;
+                    recordCollision(bounds.minX, p.y, impulse, now);
+                }
+                // 오른쪽 피스톤 벽 충돌
+                else if (p.x + p.radius >= bounds.maxX) {
+                    p.x = bounds.maxX - p.radius;
+                    const impulse = Math.abs(p.vx) * 2;
+                    p.vx = -Math.abs(p.vx);
+                    p.flash = 1.0;
+                    recordCollision(bounds.maxX, p.y, impulse, now);
+                }
+
+                // 위쪽 벽 충돌
+                if (p.y - p.radius <= bounds.minY) {
+                    p.y = bounds.minY + p.radius;
+                    const impulse = Math.abs(p.vy) * 2;
+                    p.vy = Math.abs(p.vy);
+                    p.flash = 1.0;
+                    recordCollision(p.x, bounds.minY, impulse, now);
+                }
+                // 아래쪽 벽 충돌
+                else if (p.y + p.radius >= bounds.maxY) {
+                    p.y = bounds.maxY - p.radius;
+                    const impulse = Math.abs(p.vy) * 2;
+                    p.vy = -Math.abs(p.vy);
+                    p.flash = 1.0;
+                    recordCollision(p.x, bounds.maxY, impulse, now);
+                }
+            }
+
+            // 충돌 파동 애니메이션
+            for (let i = collisionRipples.length - 1; i >= 0; i--) {
+                let r = collisionRipples[i];
+                r.radius += 0.85;
+                r.alpha -= 0.045;
+                if (r.alpha <= 0) {
+                    collisionRipples.splice(i, 1);
+                }
+            }
+
+            // 최근 1초 데이터만 유지
+            const cutoff = now - 1000;
+            while (collisionTimestamps.length > 0 && collisionTimestamps[0] < cutoff) {
+                collisionTimestamps.shift();
+            }
+            while (impulseHistory.length > 0 && impulseHistory[0].time < cutoff) {
+                impulseHistory.shift();
+            }
+        }
+
+        /**
+         * 현재 계측값 계산 및 UI 업데이트
+         */
+        function updateMetrics() {
+            const collisionsPerSec = collisionTimestamps.length;
+
+            // 이상기체 상태방정식 기반 표준 기압 계산 (60 mL, 40개, 25°C일 때 정확히 1.00 기압)
+            const tempRatio = (state.tempC + 273.15) / (BASE_TEMP_C + 273.15);
+            const countRatio = state.particleCount / BASE_COUNT;
+            const volRatio = BASE_VOLUME / state.volume;
+
+            const exactPressure = 1.00 * countRatio * tempRatio * volRatio;
+            state.currentPressure = exactPressure;
+
+            // UI 텍스트 갱신
+            metricVolume.textContent = state.volume;
+            metricVolumeRatio.textContent = (state.volume / BASE_VOLUME).toFixed(2);
+            metricCollisions.textContent = collisionsPerSec;
+            metricPressure.textContent = exactPressure.toFixed(2);
+            metricPV.textContent = Math.round(exactPressure * state.volume);
+
+            // 압력이 높을수록 카드 배경 강조
+            const glowOpacity = Math.min(0.85, Math.max(0, (exactPressure - 1.0) / 3.0));
+            pressureBgGlow.style.opacity = glowOpacity.toFixed(2);
+        }
+
+        /**
+         * 주사기(실린더) 및 기체 입자 렌더링
+         */
+        function drawSimulation() {
+            const width = canvasContainer.clientWidth;
+            const height = canvasContainer.clientHeight;
+            const bounds = getCylinderBounds();
+
+            simCtx.clearRect(0, 0, width, height);
+
+            // 1. 주사기 눈금 그리기 (10 mL 단위)
+            simCtx.strokeStyle = 'rgba(71, 85, 105, 0.45)';
+            simCtx.lineWidth = 1;
+            const stepX = bounds.maxAvailableWidth / (MAX_VOLUME_SCALE / 10);
+            for (let i = 0; i <= MAX_VOLUME_SCALE / 10; i++) {
+                const gx = bounds.minX + i * stepX;
+                simCtx.beginPath();
+                simCtx.moveTo(gx, bounds.minY);
+                simCtx.lineTo(gx, bounds.maxY);
+                simCtx.stroke();
+
+                // 하단 눈금 숫자 (10mL ~ 90mL)
+                if (i >= 1) {
+                    simCtx.fillStyle = (i * 10 === state.volume) ? '#38bdf8' : '#64748b';
+                    simCtx.font = (i * 10 === state.volume) ? 'bold 11px "JetBrains Mono", monospace' : '10px "JetBrains Mono", monospace';
+                    simCtx.textAlign = 'center';
+                    simCtx.fillText(`${i * 10}`, gx, bounds.maxY + 18);
+                }
+            }
+            // 눈금 단위 표기
+            simCtx.fillStyle = '#64748b';
+            simCtx.font = '10px "Noto Sans KR", sans-serif';
+            simCtx.textAlign = 'left';
+            simCtx.fillText('(mL)', bounds.minX - 6, bounds.maxY + 18);
+
+            // 2. 실린더 내부 기체 영역 채우기
+            const pressureRatio = Math.min(1, (state.currentPressure - 0.5) / 3.5);
+            const chamberGrad = simCtx.createLinearGradient(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY);
+            chamberGrad.addColorStop(0, `rgba(14, 165, 233, ${0.06 + pressureRatio * 0.12})`);
+            chamberGrad.addColorStop(1, `rgba(244, 63, 94, ${0.04 + pressureRatio * 0.18})`);
+            simCtx.fillStyle = chamberGrad;
+            simCtx.fillRect(bounds.minX, bounds.minY, bounds.chamberWidth, bounds.chamberHeight);
+
+            // 3. 벽면 충돌 파동(노란색 반짝임) 그리기
+            for (let r of collisionRipples) {
+                simCtx.beginPath();
+                simCtx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
+                simCtx.strokeStyle = `rgba(251, 191, 36, ${r.alpha})`;
+                simCtx.lineWidth = 2.2;
+                simCtx.stroke();
+            }
+
+            // 4. 기체 입자 그리기 (부피가 변해도 입자 크기는 항상 동일!)
+            for (let p of particles) {
+                simCtx.beginPath();
+                simCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                
+                if (p.flash > 0.15) {
+                    simCtx.fillStyle = '#fde047'; // 충돌 순간 밝은 노란색
+                } else {
+                    if (state.tempC >= 55) simCtx.fillStyle = '#fb7185'; // 따뜻한 온도
+                    else if (state.tempC <= 15) simCtx.fillStyle = '#38bdf8'; // 차가운 온도
+                    else simCtx.fillStyle = '#34d399'; // 상온 (초록빛)
+                }
+                simCtx.fill();
+
+                // 입자 하이라이트
+                simCtx.beginPath();
+                simCtx.arc(p.x - p.radius * 0.3, p.y - p.radius * 0.3, p.radius * 0.35, 0, Math.PI * 2);
+                simCtx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+                simCtx.fill();
+            }
+
+            // 5. 주사기 외벽 (위, 아래, 왼쪽 막힌 끝부분)
+            simCtx.strokeStyle = '#cbd5e1';
+            simCtx.lineWidth = 4;
+            simCtx.lineCap = 'round';
+            simCtx.beginPath();
+            simCtx.moveTo(bounds.minX + bounds.maxAvailableWidth + PISTON_WIDTH, bounds.minY);
+            simCtx.lineTo(bounds.minX, bounds.minY);
+            simCtx.lineTo(bounds.minX, bounds.maxY);
+            simCtx.lineTo(bounds.minX + bounds.maxAvailableWidth + PISTON_WIDTH, bounds.maxY);
+            simCtx.stroke();
+
+            // 왼쪽 주사기 고무마개(막힘) 표시
+            simCtx.fillStyle = '#64748b';
+            simCtx.fillRect(bounds.minX - 8, (bounds.minY + bounds.maxY) / 2 - 14, 8, 28);
+
+            // 6. 이동식 피스톤
+            const pistonX = bounds.maxX;
+            const pistonCenterY = (bounds.minY + bounds.maxY) / 2;
+
+            // 피스톤 손잡이 막대
+            simCtx.fillStyle = '#475569';
+            simCtx.fillRect(pistonX + PISTON_WIDTH, pistonCenterY - 9, width - (pistonX + PISTON_WIDTH), 18);
+
+            // 피스톤 고무 패킹 헤드
+            const pistonGrad = simCtx.createLinearGradient(pistonX, bounds.minY, pistonX + PISTON_WIDTH, bounds.minY);
+            pistonGrad.addColorStop(0, '#38bdf8');
+            pistonGrad.addColorStop(0.5, '#0284c7');
+            pistonGrad.addColorStop(1, '#0369a1');
+            
+            simCtx.fillStyle = pistonGrad;
+            simCtx.beginPath();
+            simCtx.roundRect(pistonX, bounds.minY + 2, PISTON_WIDTH, bounds.chamberHeight - 4, 4);
+            simCtx.fill();
+
+            // 드래그 그립 선
+            simCtx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+            simCtx.lineWidth = 2;
+            for (let offset of [-14, 0, 14]) {
+                simCtx.beginPath();
+                simCtx.moveTo(pistonX + 7, pistonCenterY + offset);
+                simCtx.lineTo(pistonX + PISTON_WIDTH - 7, pistonCenterY + offset);
+                simCtx.stroke();
+            }
+        }
+
+        /**
+         * 중1 과학 교과서 스타일: 압력(X축) - 부피(Y축) 반비례 관계 그래프 렌더링
+         */
+        function drawChart() {
+            const width = chartContainer.clientWidth;
+            const height = chartContainer.clientHeight;
+            const pad = { top: 20, bottom: 32, left: 46, right: 24 };
+            const plotW = width - pad.left - pad.right;
+            const plotH = height - pad.top - pad.bottom;
+
+            chartCtx.clearRect(0, 0, width, height);
+
+            const maxP = 4.5; // X축 최대 기압 (4.5 기압)
+            const maxV = 90;  // Y축 최대 부피 (90 mL)
+
+            // 1. 그리드 및 축 눈금 그리기
+            chartCtx.strokeStyle = 'rgba(51, 65, 85, 0.45)';
+            chartCtx.lineWidth = 1;
+
+            // 가로선 (부피 0 ~ 90 mL)
+            for (let v = 0; v <= maxV; v += 30) {
+                const y = pad.top + plotH - (v / maxV) * plotH;
+                chartCtx.beginPath();
+                chartCtx.moveTo(pad.left, y);
+                chartCtx.lineTo(width - pad.right, y);
+                chartCtx.stroke();
+
+                chartCtx.fillStyle = '#94a3b8';
+                chartCtx.font = '10px "JetBrains Mono", monospace';
+                chartCtx.textAlign = 'right';
+                chartCtx.fillText(`${v}`, pad.left - 6, y + 3);
+            }
+
+            // 세로선 (압력 0 ~ 4 기압)
+            for (let p = 0; p <= 4; p += 1) {
+                const x = pad.left + (p / maxP) * plotW;
+                chartCtx.beginPath();
+                chartCtx.moveTo(x, pad.top);
+                chartCtx.lineTo(x, pad.top + plotH);
+                chartCtx.stroke();
+
+                chartCtx.fillStyle = '#94a3b8';
+                chartCtx.font = '10px "JetBrains Mono", monospace';
+                chartCtx.textAlign = 'center';
+                chartCtx.fillText(`${p}`, x, pad.top + plotH + 14);
+            }
+
+            // 축 제목
+            chartCtx.fillStyle = '#38bdf8';
+            chartCtx.font = 'bold 11px "Noto Sans KR", sans-serif';
+            chartCtx.textAlign = 'left';
+            chartCtx.fillText('부피(mL)', 6, 13);
+
+            chartCtx.fillStyle = '#fb7185';
+            chartCtx.textAlign = 'right';
+            chartCtx.fillText('압력(기압) →', width - 8, height - 6);
+
+            // 2. 현재 조건에서의 이론적 반비례 곡선 (P * V = k) 그리기
+            const k = state.currentPressure * state.volume;
+            chartCtx.beginPath();
+            chartCtx.strokeStyle = 'rgba(251, 113, 133, 0.5)';
+            chartCtx.lineWidth = 2;
+            chartCtx.setLineDash([4, 4]);
+
+            let started = false;
+            for (let px = 0.2; px <= maxP; px += 0.05) {
+                const vy = k / px;
+                if (vy > maxV) continue;
+                const x = pad.left + (px / maxP) * plotW;
+                const y = pad.top + plotH - (vy / maxV) * plotH;
+                if (!started) {
+                    chartCtx.moveTo(x, y);
+                    started = true;
+                } else {
+                    chartCtx.lineTo(x, y);
+                }
+            }
+            chartCtx.stroke();
+            chartCtx.setLineDash([]);
+
+            // 3. 현재 실험 상태 점(Point) 및 보조선 표시
+            const clampedP = Math.min(maxP, state.currentPressure);
+            const curX = pad.left + (clampedP / maxP) * plotW;
+            const curY = pad.top + plotH - (state.volume / maxV) * plotH;
+
+            // 점선 보조선
+            chartCtx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+            chartCtx.lineWidth = 1;
+            chartCtx.setLineDash([2, 2]);
+            chartCtx.beginPath();
+            chartCtx.moveTo(pad.left, curY);
+            chartCtx.lineTo(curX, curY);
+            chartCtx.lineTo(curX, pad.top + plotH);
+            chartCtx.stroke();
+            chartCtx.setLineDash([]);
+
+            // 현재 위치 원형 마커
+            chartCtx.beginPath();
+            chartCtx.arc(curX, curY, 6, 0, Math.PI * 2);
+            chartCtx.fillStyle = '#fb7185';
+            chartCtx.fill();
+            chartCtx.strokeStyle = '#ffffff';
+            chartCtx.lineWidth = 2;
+            chartCtx.stroke();
+
+            // 점 옆에 현재 좌표 텍스트 표시
+            chartCtx.fillStyle = '#f8fafc';
+            chartCtx.font = 'bold 11px "Noto Sans KR", sans-serif';
+            chartCtx.textAlign = curX > width - 110 ? 'right' : 'left';
+            const labelOffsetX = curX > width - 110 ? -10 : 10;
+            chartCtx.fillText(`(${state.currentPressure.toFixed(2)}기압, ${state.volume}mL)`, curX + labelOffsetX, curY - 6);
+        }
+
+        /**
+         * 메인 애니메이션 루프
+         */
+        function animate() {
+            updatePhysics();
+            updateMetrics();
+            drawSimulation();
+            drawChart();
+            requestAnimationFrame(animate);
+        }
+
+        /**
+         * 부피 값 변경 통합 핸들러
+         */
+        function setVolume(newVol) {
+            state.volume = Math.max(15, Math.min(MAX_VOLUME_SCALE, Math.round(newVol)));
+            volumeSlider.value = state.volume;
+            volumeDisplay.textContent = `${state.volume} mL`;
+            clampParticlesToCylinder();
+        }
+
+        // --- 이벤트 리스너 ---
+
+        volumeSlider.addEventListener('input', (e) => {
+            setVolume(parseFloat(e.target.value));
+        });
+
+        countSlider.addEventListener('input', (e) => {
+            state.particleCount = parseInt(e.target.value, 10);
+            countDisplay.textContent = `${state.particleCount} 개`;
+            syncParticles();
+        });
+
+        tempSlider.addEventListener('input', (e) => {
+            const newTempC = parseInt(e.target.value, 10);
+            updateParticlesTemperature(state.tempC, newTempC);
+            state.tempC = newTempC;
+            const statusText = newTempC === BASE_TEMP_C ? ' (일정)' : (newTempC > BASE_TEMP_C ? ' (빠름)' : ' (느림)');
+            tempDisplay.textContent = `${state.tempC} °C${statusText}`;
+        });
+
+        // 캔버스 피스톤 직접 드래그
+        function handlePointerDown(clientX) {
+            const rect = simCanvas.getBoundingClientRect();
+            const x = clientX - rect.left;
+            const bounds = getCylinderBounds();
+            if (Math.abs(x - (bounds.maxX + PISTON_WIDTH / 2)) < 50) {
+                state.isDraggingPiston = true;
+            }
+        }
+
+        function handlePointerMove(clientX) {
+            if (!state.isDraggingPiston) return;
+            const rect = simCanvas.getBoundingClientRect();
+            const x = clientX - rect.left;
+            const bounds = getCylinderBounds();
+
+            const targetChamberWidth = x - bounds.minX - PISTON_WIDTH / 2;
+            const newVol = (targetChamberWidth / bounds.maxAvailableWidth) * MAX_VOLUME_SCALE;
+            setVolume(newVol);
+        }
+
+        function handlePointerUp() {
+            state.isDraggingPiston = false;
+        }
+
+        simCanvas.addEventListener('mousedown', (e) => handlePointerDown(e.clientX));
+        window.addEventListener('mousemove', (e) => handlePointerMove(e.clientX));
+        window.addEventListener('mouseup', handlePointerUp);
+
+        simCanvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 0) handlePointerDown(e.touches[0].clientX);
+        }, { passive: true });
+        window.addEventListener('touchmove', (e) => {
+            if (state.isDraggingPiston && e.touches.length > 0) {
+                handlePointerMove(e.touches[0].clientX);
+            }
+        }, { passive: true });
+        window.addEventListener('touchend', handlePointerUp);
+
+        // 일시정지 버튼
+        btnPause.addEventListener('click', () => {
+            state.isPaused = !state.isPaused;
+            document.getElementById('pauseIcon').textContent = state.isPaused ? '▶' : '⏸';
+            document.getElementById('pauseText').textContent = state.isPaused ? '다시 시작' : '일시정지';
+            btnPause.classList.toggle('bg-sky-600', !state.isPaused);
+            btnPause.classList.toggle('bg-emerald-600', state.isPaused);
+        });
+
+        // 초기화 버튼
+        btnReset.addEventListener('click', () => {
+            state.volume = BASE_VOLUME;
+            state.particleCount = BASE_COUNT;
+            state.tempC = BASE_TEMP_C;
+            state.isPaused = false;
+
+            volumeSlider.value = BASE_VOLUME;
+            countSlider.value = BASE_COUNT;
+            tempSlider.value = BASE_TEMP_C;
+
+            volumeDisplay.textContent = `${BASE_VOLUME} mL`;
+            countDisplay.textContent = `${BASE_COUNT} 개`;
+            tempDisplay.textContent = `${BASE_TEMP_C} °C (일정)`;
+
+            document.getElementById('pauseIcon').textContent = '⏸';
+            document.getElementById('pauseText').textContent = '일시정지';
+            btnPause.classList.add('bg-sky-600');
+            btnPause.classList.remove('bg-emerald-600');
+
+            particles = [];
+            collisionTimestamps = [];
+            impulseHistory = [];
+            syncParticles();
+        });
+
+        window.addEventListener('resize', resizeCanvases);
+
+        window.onload = function() {
+            resizeCanvases();
+            syncParticles();
+            animate();
+        };
+    </script>
+</body>
+</html>
